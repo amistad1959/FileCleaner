@@ -1,1 +1,2 @@
-This project allows to remove unnessary notations in the bible text file
+This project allows to remove unnessary notations in the bible text file.
+We use visual c++.
