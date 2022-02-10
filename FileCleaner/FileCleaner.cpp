@@ -6,9 +6,199 @@
 #include <fstream>
 #include <string>
 #include <sstream>      // std::istringstream
+#include <vector>
+
+#include <chrono>
+
 
 using namespace std;
 
+/*********************Make verse************************************/
+class Verse
+{
+	uint16_t	verseNbr;
+	uint16_t	chapterNbr;
+	string		book;
+	string		verse;
+
+public:
+	Verse();
+	~Verse();
+	Verse(const Verse&);
+	Verse& operator=(const Verse& verse);
+	Verse(Verse&&);
+	Verse& operator=(const Verse&& verse);
+	friend ostream &operator<<(ostream &output, const Verse &v);
+	friend istream &operator>>(istream &input, Verse &v);
+	static Verse makeVerse(string& line);
+	static bool makeVerses(string& inFile, string& outFile);
+	static bool loadObjects(string& inFile, vector<unique_ptr<Verse>>& verses);
+};
+
+Verse::~Verse()
+{
+	this->verseNbr = 0;
+	this->chapterNbr = 0;
+	(this->book).empty();
+	(this->verse).empty();
+}
+
+
+Verse::Verse()
+{
+	this->verseNbr=0;
+	this->chapterNbr=0;
+	this->book="";
+	this->verse="";
+}
+
+Verse::Verse(const Verse& verse)
+{
+	this->verseNbr=verse.verseNbr;
+	this->chapterNbr=verse.chapterNbr;
+	this->book=verse.book;
+	this->verse=verse.verse;
+}
+
+Verse& Verse::operator=(const Verse& verse) 
+{
+	this->verseNbr=verse.verseNbr;
+	this->chapterNbr=verse.chapterNbr;
+	this->book=verse.book;
+	this->verse=verse.verse;
+
+	return *this;
+}
+
+Verse::Verse(Verse&& verse)
+{
+	this->verseNbr=verse.verseNbr;
+	this->chapterNbr=verse.chapterNbr;
+	this->book=move(verse.book);
+	this->verse=move(verse.verse);
+}
+
+Verse& Verse::operator=(const Verse&& verse)
+{
+	this->verseNbr = verse.verseNbr;
+	this->chapterNbr = verse.chapterNbr;
+	this->book = move(verse.book);
+	this->verse = move(verse.verse);
+
+	return *this;
+}
+
+ostream &operator<<(ostream &output, const Verse &v)
+{
+	char sep = '@';
+	output << v.book << sep << v.chapterNbr << sep << v.verseNbr  << sep << v.verse << endl;
+	return output;
+}
+
+istream &operator>>(istream &input, Verse &v)
+{
+	string str;
+	getline(input, v.book, '@');
+	getline(input, str, '@');
+	v.chapterNbr=  std::stoi(str);
+	getline(input, str, '@');
+	v.verseNbr =  std::stoi(str);
+	getline(input, v.verse, '@');
+
+	return input;
+}
+
+Verse Verse::makeVerse(string& line)
+{
+	Verse verseRet;
+	string str;
+
+	istringstream iss(line);
+	getline(iss, verseRet.book, ' ');
+	if (isdigit(verseRet.book[0]))
+	{
+		getline(iss, str, ' ');
+		verseRet.book + ' ' + str;
+	}
+	else if (verseRet.book == "Song")
+	{
+		verseRet.book = "Song of Solomon";
+		getline(iss, str, ' ');
+		getline(iss, str, ' ');
+
+	}
+	getline(iss,str,':');
+	verseRet.chapterNbr= std::stoi(str);
+	getline(iss,str,' ');
+	verseRet.verseNbr= std::stoi(str);
+	while (getline(iss, str, ' '))
+	{
+		verseRet.verse = verseRet.verse + str + " ";
+	}
+	verseRet.verse.pop_back();  // remove the last space added
+
+	return verseRet;
+}
+
+bool Verse::makeVerses(string& inFile, string& outFile)
+{
+	ifstream ifs;
+	ofstream ofs;
+	string line;
+
+	ifs.open(inFile);
+	if (ifs.fail())
+	{
+		cerr << "error opening input file" << endl;
+		return false;
+	}
+
+	ofs.open(outFile);
+	if (ofs.fail())
+	{
+		cerr << "error opening output file" << endl;
+		return false;
+	}
+
+	// skip the first line
+	getline(ifs, line, '\n');
+	while (getline(ifs, line, '\n'))
+	{
+		Verse currVerse=Verse::makeVerse(line);
+		ofs << currVerse;
+	}
+
+	ifs.close();
+	ofs.close();
+
+	return true;
+}
+
+bool Verse::loadObjects(string& inFile, vector<unique_ptr<Verse>>& verses)
+{
+	ifstream ifs;
+	string line;
+
+	ifs.open(inFile);
+	if (ifs.fail())
+	{
+		cerr << "error opening input file" << endl;
+		return false;
+	}
+
+	while (getline(ifs, line, '\n'))
+	{
+		istringstream iss(line);
+		unique_ptr<Verse> versePtr = std::make_unique<Verse>();
+		iss >> (*versePtr);
+		verses.push_back(move(versePtr));
+	}
+
+	ifs.close();
+	return true;
+}
+
+/*****************Clean line ******************************************/
 void processLine(string& line)
 {
 	char current=0;
@@ -65,14 +255,45 @@ bool ReadFile(string& inFile)
 
 int main(int argc, char* argv[])
 { 
-	if (argc == 0)
+	chrono::time_point<std::chrono::system_clock> start, end;
+
+	start = std::chrono::system_clock::now();
+	if (argc == 1)
 	{
 		cerr << "No argument has been entered. Enter file to process" << endl;
 		return 0;
 	}
+	else if (argc == 2)
+	{
+		string str = argv[1];
+		ReadFile(str);
+	}
+	else if ((argc == 3) && (!strcmp(argv[2],"-l")))
+	{
+		constexpr int max_elements = 31104;
+		vector<unique_ptr<Verse>> verses;
+		verses.reserve(max_elements);
+		string fileInput = argv[1];
+		Verse::loadObjects(fileInput,verses);
+	}
+	else if(argc==3)
+	{
+		string fileInput = argv[1];
+		string fileOutput = argv[2];
+		Verse::makeVerses(fileInput,fileOutput);
+	}
+	else
+	{
+		cerr << "too many arguments" << endl;
+		return 0;
+	}
 
-	string str=argv[1];
+	end = std::chrono::system_clock::now();
 
-	ReadFile(str);
+	chrono::duration<double> elapsed_seconds = end - start;
+	time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+	cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
+
 }
 
