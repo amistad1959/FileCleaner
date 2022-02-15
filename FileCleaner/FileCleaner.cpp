@@ -30,9 +30,11 @@ public:
 	Verse& operator=(const Verse&& verse);
 	friend ostream &operator<<(ostream &output, const Verse &v);
 	friend istream &operator>>(istream &input, Verse &v);
+	string toString(size_t width=0);
 	static Verse makeVerse(string& line);
 	static bool makeVerses(string& inFile, string& outFile);
 	static bool loadObjects(string& inFile, vector<unique_ptr<Verse>>& verses);
+	static bool SearchString(string searchStr, vector<unique_ptr<Verse>>& verses, vector<Verse>& versesOut);
 };
 
 Verse::~Verse()
@@ -42,7 +44,6 @@ Verse::~Verse()
 	(this->book).empty();
 	(this->verse).empty();
 }
-
 
 Verse::Verse()
 {
@@ -108,6 +109,42 @@ istream &operator>>(istream &input, Verse &v)
 	return input;
 }
 
+string Verse::toString(size_t width)
+{
+	string strReturn;
+	string strRemain=verse;
+	size_t strIdx=0;
+
+	strReturn=book+" "+to_string(chapterNbr)+":"+to_string(verseNbr)+" ";
+	
+	if (width == 0)
+	{
+		strReturn += verse;
+	}
+	else
+	{
+		strReturn+="\n";
+		do
+		{
+			size_t nBegin = strIdx;
+			string strTemp=strRemain;
+
+			strIdx = strTemp.find(' ', width);
+			if (strIdx != string::npos)
+			{
+				strTemp = strRemain.substr(0, strIdx+1);
+				strRemain=strRemain.substr(strIdx);
+			}
+			if(strTemp[0]==' ')
+				strTemp.erase(0,1);
+			strReturn += strTemp;
+			strReturn += '\n';
+		} while (strIdx != string::npos);
+	}
+
+	return strReturn;
+}
+
 Verse Verse::makeVerse(string& line)
 {
 	Verse verseRet;
@@ -118,7 +155,7 @@ Verse Verse::makeVerse(string& line)
 	if (isdigit(verseRet.book[0]))
 	{
 		getline(iss, str, ' ');
-		verseRet.book + ' ' + str;
+		verseRet.book=verseRet.book + ' ' + str;
 	}
 	else if (verseRet.book == "Song")
 	{
@@ -198,6 +235,16 @@ bool Verse::loadObjects(string& inFile, vector<unique_ptr<Verse>>& verses)
 	return true;
 }
 
+bool Verse::SearchString(string searchStr, vector<unique_ptr<Verse>>& verses, vector<Verse>& versesOut)
+{
+	for (const unique_ptr<Verse>& verse : verses)
+	{
+		if(verse->verse.find(searchStr) != string::npos)
+			versesOut.push_back(*verse);
+	}
+
+	return true;
+}
 /*****************Clean line ******************************************/
 void processLine(string& line)
 {
@@ -253,6 +300,36 @@ bool ReadFile(string& inFile)
 	return true;
 }
 
+void run(vector<unique_ptr<Verse>>& verses)
+{
+	chrono::time_point<std::chrono::system_clock> start, end;
+	while (true)
+	{
+		string str;
+		cout << "Type words to search or | to end" << endl;
+		getline(cin,str);
+		if (str.find('|') != string::npos)
+		{
+			cout << "Ending";
+			break;
+		}
+
+		start = std::chrono::system_clock::now();
+		cout << "Searching for " << str << endl;
+		vector<Verse> versesOut;
+		Verse::SearchString(str,verses,versesOut);
+		for ( Verse verse : versesOut)
+		{
+			cout << verse.toString(60);
+		}
+
+		end = std::chrono::system_clock::now();
+		chrono::duration<double> elapsed_seconds = end - start;
+		cout << "Search time: " << elapsed_seconds.count() << "s\n" << endl;
+	}
+
+}
+
 int main(int argc, char* argv[])
 { 
 	chrono::time_point<std::chrono::system_clock> start, end;
@@ -275,6 +352,10 @@ int main(int argc, char* argv[])
 		verses.reserve(max_elements);
 		string fileInput = argv[1];
 		Verse::loadObjects(fileInput,verses);
+		end = std::chrono::system_clock::now();
+		chrono::duration<double> elapsed_seconds = end - start;
+		cout << "Load time: " << elapsed_seconds.count() << "s\n"<<endl;
+		run(verses);
 	}
 	else if(argc==3)
 	{
@@ -293,7 +374,8 @@ int main(int argc, char* argv[])
 	chrono::duration<double> elapsed_seconds = end - start;
 	time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
+	cout << "Total elapsed time: " << elapsed_seconds.count() << "s\n";
 
 }
+
 
